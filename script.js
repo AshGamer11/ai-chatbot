@@ -1,48 +1,53 @@
+// ================= CHAT SEND =================
 async function sendMessage() {
     const input = document.getElementById("input");
     const message = input.value.trim();
-    let chats = JSON.parse(localStorage.getItem("chats")) || {};
-let currentChat = "default";
-
-if (!chats[currentChat]) chats[currentChat] = [];
-
-function saveChats() {
-  localStorage.setItem("chats", JSON.stringify(chats));
-}
 
     if (!message) return;
 
     addMessage(message, "user");
-
     input.value = "";
 
     // Typing loader
     const loader = addMessage("...", "bot");
 
-let dots = 0;
-const interval = setInterval(() => {
-    loader.innerText = ".".repeat((dots % 3) + 1);
-    dots++;
-}, 500);
+    let dots = 0;
+    const interval = setInterval(() => {
+        loader.innerText = ".".repeat((dots % 3) + 1);
+        dots++;
+    }, 500);
 
-    const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message })
-    });
+    try {
+        const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message })
+        });
 
-    const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch {
+            data = { reply: "⚠️ Invalid server response" };
+        }
 
-    clearInterval(interval);
-typeEffect(loader, data.reply);
+        clearInterval(interval);
 
-    loader.remove(); // remove "Typing..."
+        // ✅ Typing effect on SAME loader
+        typeEffect(loader, data.reply);
 
-    addMessage(data.reply, "bot");
+        // ✅ Save bot reply
+        saveMessage(data.reply, "bot");
+
+    } catch (e) {
+        clearInterval(interval);
+        loader.innerText = "⚠️ Server error";
+    }
 }
 
+// ================= ADD MESSAGE =================
 function addMessage(text, type) {
     const chat = document.getElementById("chat");
 
@@ -68,31 +73,47 @@ function addMessage(text, type) {
     chat.appendChild(wrapper);
     chat.scrollTop = chat.scrollHeight;
 
-    saveChat(); // 👈 important for step 6
+    // ✅ Save user message
+    saveMessage(text, type);
 
     return msg;
 }
+
+// ================= SAVE CHAT =================
+function saveMessage(text, type) {
+    let chats = JSON.parse(localStorage.getItem("chat")) || [];
+    chats.push({ text, type });
+    localStorage.setItem("chat", JSON.stringify(chats));
+}
+
+// ================= LOAD CHAT =================
+function loadChat() {
+    const saved = JSON.parse(localStorage.getItem("chat")) || [];
+    const chat = document.getElementById("chat");
+
+    chat.innerHTML = "";
+
+    saved.forEach(msg => {
+        addMessage(msg.text, msg.type);
+    });
+}
+
+window.onload = loadChat;
+
+// ================= ENTER KEY =================
 document.getElementById("input").addEventListener("keypress", function(e) {
     if (e.key === "Enter") {
         sendMessage();
     }
 });
+
+// ================= CLEAR CHAT =================
 function clearChat() {
     document.getElementById("chat").innerHTML = "";
     localStorage.removeItem("chat");
 }
-function saveChat() {
-    const chat = document.getElementById("chat").innerHTML;
-    localStorage.setItem("chat", chat);
-}
 
-function loadChat() {
-    const saved = localStorage.getItem("chat");
-    if (saved) {
-        document.getElementById("chat").innerHTML = saved;
-    }
-}
-window.onload = loadChat;
+// ================= VOICE INPUT =================
 function startVoice() {
     const recognition = new webkitSpeechRecognition();
 
@@ -104,7 +125,14 @@ function startVoice() {
 
     recognition.start();
 }
+
+// ================= TYPE EFFECT =================
 function typeEffect(element, text) {
+    if (!text) {
+        element.innerText = "⚠️ No response";
+        return;
+    }
+
     let i = 0;
     element.innerText = "";
 
@@ -112,5 +140,5 @@ function typeEffect(element, text) {
         element.innerText += text.charAt(i);
         i++;
         if (i >= text.length) clearInterval(interval);
-    }, 15);
+    }, 20);
 }
