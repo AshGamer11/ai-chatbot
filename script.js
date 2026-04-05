@@ -1,6 +1,14 @@
 async function sendMessage() {
     const input = document.getElementById("input");
     const message = input.value.trim();
+    let chats = JSON.parse(localStorage.getItem("chats")) || {};
+let currentChat = "default";
+
+if (!chats[currentChat]) chats[currentChat] = [];
+
+function saveChats() {
+  localStorage.setItem("chats", JSON.stringify(chats));
+}
 
     if (!message) return;
 
